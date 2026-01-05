@@ -1,71 +1,93 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, Image, StyleSheet, TouchableOpacity, ScrollView, FlatList } from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Video } from 'expo-av';
 
-export default function ViewTimelineScreen({ route }) {
+
+export default function ViewTimelineScreen() {
+  const route = useRoute();
   const navigation = useNavigation();
   const { timelineId } = route.params || {};
+  const [moment, setMoment] = useState(null);
 
-  const mock = {
-    title: 'Sample Timeline Event',
-    date: '2024-01-01',
-    media: [
-      { id: '1', type: 'image', uri: 'https://hips.hearstapps.com/hmg-prod/images/high-angle-view-of-tokyo-skyline-at-dusk-japan-royalty-free-image-1664309926.jpg' },
-      { id: '2', type: 'image', uri: 'https://carolettings.com/wp-content/uploads/2021/06/shutterstock_658847998-1.jpg' },
-      { id: '3', type: 'video', uri: 'https://www.w3schools.com/html/mov_bbb.mp4' },
-      { id: '4', type: 'video', uri: 'https://www.w3schools.com/html/mov_bbb.mp4' },
-      { id: '5', type: 'video', uri: 'https://www.w3schools.com/html/mov_bbb.mp4' },
-      { id: '6', type: 'video', uri: 'https://www.w3schools.com/html/mov_bbb.mp4' },
-    ],
-    description: 'This is a placeholder description for a timeline moment. You can replace with real data.',
-  };
+  useEffect(() => {
+    const fetchMoment = async () => {
+      try {
+        const existingMoments = await AsyncStorage.getItem('moments');
+        if (existingMoments) {
+          const moments = JSON.parse(existingMoments);
+          const selectedMoment = moments.find((m) => m.id === timelineId); // Find the moment by id
+          setMoment(selectedMoment);
+        }
+      } catch (error) {
+        console.error('Error fetching moment:', error);
+      }
+    };
 
-  const mainImage = mock.media.find((item) => item.type === 'image'); // Main image
-  const otherMedia = mock.media.filter((item) => item.id !== mainImage?.id); // Other media
+    fetchMoment();
+  }, [timelineId]);
+
+  if (!moment) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.errorText}>Moment not found!</Text>
+      </View>
+    );
+  }
 
   const renderMediaItem = ({ item }) => {
-    if (item.type === 'image') {
-      return <Image source={{ uri: item.uri }} style={styles.media} />;
-    } else if (item.type === 'video') {
+    if (item.endsWith('.mp4') || item.endsWith('.mov')) {
       return (
-        <View style={styles.videoContainer}>
-          <Text style={styles.videoPlaceholder}>Video Placeholder</Text>
-          {/* Replace the Text with a video player component like `react-native-video` */}
-        </View>
+        <Video
+          source={{ uri: item }}
+          style={styles.media}
+          useNativeControls
+          resizeMode="contain"
+        />
       );
+    } else {
+      return <Image source={{ uri: item }} style={styles.media} />;
     }
-    return null;
   };
 
   return (
     <ScrollView style={styles.container}>
-      <Text style={styles.title}>{mock.title}</Text>
-      <Text style={styles.date}>{mock.date}</Text>
+      <Text style={styles.title}>{moment.title}</Text>
+      <Text style={styles.date}>{moment.date}</Text>
 
-      {/* Main Image */}
-      {mainImage && <Image source={{ uri: mainImage.uri }} style={styles.mainImage} />}
+      {moment.media.length > 0 && moment.media[0] && (
+        <Image source={{ uri: moment.media[0] }} style={styles.mainImage} />
+      )}
 
-      {/* Scrollable Media List with Scrollbar */}
       <ScrollView horizontal showsHorizontalScrollIndicator style={styles.mediaList}>
-        {otherMedia.map((item) => (
-          <View key={item.id} style={styles.mediaWrapper}>
-            {renderMediaItem({ item })}
+        {moment.media.map((uri, index) => (
+          <View key={index} style={styles.mediaWrapper}>
+            {renderMediaItem({ item: uri })}
           </View>
         ))}
       </ScrollView>
 
-      <Text style={styles.desc}>{mock.description}</Text>
+      <Text style={styles.desc}>{moment.desc}</Text>
+      <Text style={styles.address}>Location: {moment.address}</Text>
 
       <View style={styles.buttonRow}>
         <TouchableOpacity
-          style={[styles.button, { backgroundColor: '#007AFF' }]}
-          onPress={() => navigation.navigate('AddTimeline', { editing: true })}
-        >
-          <Text style={styles.buttonText}>Edit</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
           style={[styles.button, { backgroundColor: '#ff3b30' }]}
+          onPress={async () => {
+            try {
+              const existingMoments = await AsyncStorage.getItem('moments');
+              if (existingMoments) {
+                const moments = JSON.parse(existingMoments);
+                const updatedMoments = moments.filter((m) => m.id !== timelineId); // Remove the moment
+                await AsyncStorage.setItem('moments', JSON.stringify(updatedMoments));
+                alert('Moment deleted successfully!');
+                navigation.navigate('Home');
+              }
+            } catch (error) {
+              console.error('Error deleting moment:', error);
+            }
+          }}
         >
           <Text style={styles.buttonText}>Delete</Text>
         </TouchableOpacity>
@@ -79,6 +101,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 24, fontWeight: '700', marginBottom: 8 },
   date: { fontSize: 16, color: '#777', marginBottom: 16 },
   desc: { marginTop: 20, fontSize: 16, lineHeight: 22 },
+  address: { marginTop: 10, fontSize: 14, color: '#555' },
   mainImage: {
     width: '100%',
     height: 250,
@@ -97,15 +120,6 @@ const styles = StyleSheet.create({
     height: 200,
     borderRadius: 12,
   },
-  videoContainer: {
-    width: 300,
-    height: 200,
-    borderRadius: 12,
-    backgroundColor: '#000',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  videoPlaceholder: { color: '#fff', fontSize: 16 },
   buttonRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 30 },
   button: {
     padding: 14,
@@ -115,4 +129,5 @@ const styles = StyleSheet.create({
     marginHorizontal: 5,
   },
   buttonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  errorText: { fontSize: 18, color: 'red', textAlign: 'center', marginTop: 20 },
 });
