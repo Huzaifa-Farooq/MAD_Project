@@ -1,64 +1,69 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation } from "@react-navigation/native";
+import { useState } from "react";
+import { View,Text,TextInput,Button } from "react-native";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-export default function SignupScreen() {
-  const navigation = useNavigation();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
 
-  return (
-    <View style={styles.container}>
-      <Text style={styles.header}>Create an Account</Text>
+const SignupScreen=()=>{
+    const navigation = useNavigation();
 
-      <TextInput
-        placeholder="Email"
-        value={email}
-        onChangeText={setEmail}
-        style={styles.input}
-      />
+    const[nemail, nsetemail] = useState('');
+    const[npassword, nsetpassword]= useState('');
 
-      <TextInput
-        placeholder="Password"
-        secureTextEntry
-        value={password}
-        onChangeText={setPassword}
-        style={styles.input}
-      />
 
-      <TouchableOpacity style={styles.button}>
-        <Text style={styles.buttonText}>Sign Up</Text>
-      </TouchableOpacity>
+    const validation= async()=>{
 
-      <TouchableOpacity onPress={() => navigation.navigate('Login')}>
-        <Text style={styles.link}>Already have an account? Log in</Text>
-      </TouchableOpacity>
-    </View>
-  );
+        if(nemail === '' && npassword === ''){
+            alert('Please fill all fields');
+            return;
+        }
+        else{
+            try{
+                const userData = {
+                        email: nemail,
+                        password: npassword
+                    };  
+                const users = await AsyncStorage.getItem('users');
+                const existingUsers = users ? JSON.parse(users) : [];
+                const newUsers = [...existingUsers, userData];
+                await AsyncStorage.setItem('users', JSON.stringify(newUsers));
+                alert('Signup successful! Please login.');
+                navigation.navigate('Login');
+            }catch(error){
+                console.log(error);
+            }
+        }
+    }
+
+    return(
+        <View >
+            <Text style={{fontSize:45, fontWeight:'bold', textAlign:'center', marginTop:70}}>Signup</Text>
+            <View style={{marginTop:70,alignContent:'center',padding:20}}>
+
+                <Text>Email:</Text>
+                <TextInput 
+                placeholder="Enter email" 
+                style={{borderWidth:1, borderColor:'black', marginBottom:20}}
+                onChangeText={(text)=>{nsetemail(text)}}
+                value={nemail}
+                 /> 
+                
+          
+                <Text>Password:</Text>
+                <TextInput 
+                placeholder="Enter password" 
+                secureTextEntry={true}
+                style={{borderWidth:1, borderColor:'black', marginBottom:20}}
+                onChangeText={(text)=>{nsetpassword(text)}}
+                value={npassword}
+                 />
+
+
+                  <Button title="Signup" onPress={() => {validation()}} />
+            </View>
+          
+        </View>
+    )
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20, justifyContent: 'center' },
-  header: { fontSize: 26, fontWeight: '700', textAlign: 'center', marginBottom: 20 },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    padding: 14,
-    borderRadius: 8,
-    marginBottom: 12,
-  },
-  button: {
-    backgroundColor: '#007AFF',
-    padding: 14,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginTop: 10,
-  },
-  buttonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  link: {
-    color: '#007AFF',
-    marginTop: 14,
-    textAlign: 'center',
-    fontSize: 14,
-  },
-});
+export default SignupScreen;
